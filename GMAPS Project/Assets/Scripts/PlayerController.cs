@@ -30,6 +30,7 @@ public class PlayerController : MonoBehaviour
     public Vector3 LocalVelocity { get; private set; }
     public float AngleOfAttack { get; private set; }
 
+    // Sensitivity modifier property for fine-tuning sensitivity based on mass
     private float sensitivityModifier
     {
         get
@@ -64,10 +65,12 @@ public class PlayerController : MonoBehaviour
 
     private void HandleInputs()
     {
+        // Get input for roll, pitch, and yaw
         roll = Input.GetAxis("Horizontal");
         pitch = Input.GetAxis("Vertical");
         yaw = Input.GetAxis("Yaw");
 
+        // Adjust throttle based on key inputs
         if (Input.GetKey(KeyCode.Space))
         {
             IncreaseThrottle();
@@ -77,10 +80,13 @@ public class PlayerController : MonoBehaviour
             DecreaseThrottle();
         }
 
+        // Adjust engine sound volume based on throttle, clamp volume between minVolume and maxVolume
         engineSound.volume = Mathf.Clamp(throttle * 0.01f, minVolume, maxVolume);
 
+        // Clamp throttle value between 0 and 100
         throttle = Mathf.Clamp(throttle, 0f, 100f);
 
+        // Set propeller speed based on throttle
         propeller.speed = throttle * 20f;
     }
 
@@ -89,11 +95,13 @@ public class PlayerController : MonoBehaviour
         HandleInputs();
         UpdateHUD();
 
+        // Reload scene when R is pressed
         if (Input.GetKeyDown(KeyCode.R))
         {
             SceneManager.LoadScene(1);
         }
 
+        // Switch cameras when C is pressed
         if (Input.GetKeyDown(KeyCode.C))
         {
             if (CameraManager.IsActiveCamera(thirdPersonCam))
@@ -109,13 +117,13 @@ public class PlayerController : MonoBehaviour
 
     void Thrust()
     {
-        // Apply forward force to the plane
+        // Apply thrust force to the plane
         rb.AddForce(transform.forward * maxThrust * throttle);
     }
 
     void Pitch()
     {
-        // Apply rotational force on the x-axis to turn the plane up and down
+        // Apply rotational force on the x-axis to pitch the plane up and down
         rb.AddTorque(transform.right * pitch * sensitivityModifier);
     }
 
@@ -127,7 +135,7 @@ public class PlayerController : MonoBehaviour
 
     void Yaw()
     {
-        // Apply rotational force on the y-axis to turn the plane left and right
+        // Apply rotational force on the y-axis to rotate the plane left and right
         rb.AddTorque(transform.up * yaw * sensitivityModifier);
     }
 
@@ -136,55 +144,42 @@ public class PlayerController : MonoBehaviour
         //// Apply upward force to lift the plane upwards
         //rb.AddForce(Vector3.up * rb.velocity.magnitude * lift);
 
-        //// Evaluate the lift curve based on the angle of attack
-        //float angleOfAttack = Vector3.Angle(Vector3.up, transform.forward);
-        //float liftForce = liftAOACurve.Evaluate(angleOfAttack) * lift;
-
-        //// Apply upward force to lift the plane upwards
-        //rb.AddForce(Vector3.up * liftForce);
-
-        if (LocalVelocity.sqrMagnitude < 1f) return;
-
-        var liftForce = CalculateLift(
-            AngleOfAttack, Vector3.right,
-            lift,
-            liftAOACurve
-        );
+        var liftForce = CalculateLift(AngleOfAttack, Vector3.right, lift, liftAOACurve);
 
         rb.AddForce(liftForce);
     }
 
     void CalculateAngleOfAttack()
     {
-        if (LocalVelocity.sqrMagnitude < 0.1f)
-        {
-            AngleOfAttack = 0;
-            return;
-        }
-
+        // Calculate the angle of attack based on the local velocity
         AngleOfAttack = Mathf.Atan2(-LocalVelocity.y, LocalVelocity.z);
     }
 
+    // Calculate the state of the airplane, including velocity and local velocity
     void CalculateState(float dt)
     {
         var invRotation = Quaternion.Inverse(rb.rotation);
         Velocity = rb.velocity;
-        LocalVelocity = invRotation * Velocity;  //transform world velocity into local space
+        // Transform world velocity into local space
+        LocalVelocity = invRotation * Velocity;  
 
         CalculateAngleOfAttack();
     }
 
+    // Calculate the lift force based on angle of attack and an animation curve
     Vector3 CalculateLift(float angleOfAttack, Vector3 rightAxis, float liftPower, AnimationCurve aoaCurve)
     {
-        var liftVelocity = Vector3.ProjectOnPlane(LocalVelocity, rightAxis);    //project velocity onto YZ plane
-        var v2 = liftVelocity.sqrMagnitude;                                     //square of velocity
+        // Project velocity onto YZ plane
+        var liftVelocity = Vector3.ProjectOnPlane(LocalVelocity, rightAxis);
+        // Square of velocity
+        var v2 = liftVelocity.sqrMagnitude;                                     
 
-        //lift = velocity^2 * coefficient * liftPower
-        //coefficient varies with AOA
+        // Lift = velocity^2 * coefficient * liftPower
+        // Coefficient varies with AOA
         var liftCoefficient = aoaCurve.Evaluate(angleOfAttack * Mathf.Rad2Deg);
         var liftForce = v2 * liftCoefficient * liftPower;
 
-        //lift is perpendicular to velocity
+        // Lift is perpendicular to velocity
         var liftDirection = Vector3.Cross(liftVelocity.normalized, rightAxis);
         var lift = liftDirection * liftForce;
 
@@ -206,7 +201,7 @@ public class PlayerController : MonoBehaviour
 
         float dt = Time.fixedDeltaTime;
 
-        //calculate at start, to capture any changes that happened externally
+        // Calculate at start, to capture any changes that happened externally
         CalculateState(dt);
 
         Thrust();
@@ -215,7 +210,7 @@ public class PlayerController : MonoBehaviour
         Yaw();
         Lift();
 
-        //calculate again, so that other systems can read this plane's state
+        // Calculate again, so that other systems can read this plane's state
         CalculateState(dt);
     }
 
