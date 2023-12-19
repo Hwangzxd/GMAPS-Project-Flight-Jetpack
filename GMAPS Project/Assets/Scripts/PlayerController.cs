@@ -11,24 +11,21 @@ public class PlayerController : MonoBehaviour
     [SerializeField] CinemachineVirtualCamera thirdPersonCam;
     [SerializeField] CinemachineVirtualCamera lookBackCam;
 
-    [SerializeField] AnimationCurve liftAOACurve;
+    Rigidbody rb;
+    AudioSource engineSound;
+    Propeller propeller;
 
     public float throttleIncrement = 0.1f;
     public float maxThrust = 200f;
     public float sensitivity = 200f;
     public float lift = 135f;
 
-    private float minVolume = 0f;
-    private float maxVolume = 0.2f;
-
     private float throttle;
     private float roll;
     private float pitch;
     private float yaw;
-
-    public Vector3 Velocity { get; private set; }
-    public Vector3 LocalVelocity { get; private set; }
-    public float AngleOfAttack { get; private set; }
+    private float minVolume = 0f;
+    private float maxVolume = 0.2f;
 
     // Sensitivity modifier property for fine-tuning sensitivity based on mass
     private float sensitivityModifier
@@ -38,10 +35,6 @@ public class PlayerController : MonoBehaviour
             return (rb.mass / 10f) * sensitivity;
         }
     }
-
-    Rigidbody rb;
-    AudioSource engineSound;
-    Propeller propeller;
 
     private void OnEnable()
     {
@@ -115,6 +108,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    void IncreaseThrottle()
+    {
+        throttle += throttleIncrement;
+    }
+
+    void DecreaseThrottle()
+    {
+        throttle -= throttleIncrement;
+    }
+
     void Thrust()
     {
         // Apply thrust force to the plane
@@ -141,87 +144,17 @@ public class PlayerController : MonoBehaviour
 
     void Lift()
     {
-        //// Apply upward force to lift the plane upwards
-        //rb.AddForce(Vector3.up * rb.velocity.magnitude * lift);
-
-        var liftForce = CalculateLift(AngleOfAttack, Vector3.right, lift, liftAOACurve);
-
-        rb.AddForce(liftForce);
-    }
-
-    void CalculateAngleOfAttack()
-    {
-        // Calculate the angle of attack based on the local velocity
-        AngleOfAttack = Mathf.Atan2(-LocalVelocity.y, LocalVelocity.z);
-    }
-
-    // Calculate the state of the airplane, including velocity and local velocity
-    void CalculateState(float dt)
-    {
-        var invRotation = Quaternion.Inverse(rb.rotation);
-        Velocity = rb.velocity;
-        // Transform world velocity into local space
-        LocalVelocity = invRotation * Velocity;  
-
-        CalculateAngleOfAttack();
-    }
-
-    // Calculate the lift force based on angle of attack and an animation curve
-    Vector3 CalculateLift(float angleOfAttack, Vector3 rightAxis, float liftPower, AnimationCurve aoaCurve)
-    {
-        // Project velocity onto YZ plane
-        var liftVelocity = Vector3.ProjectOnPlane(LocalVelocity, rightAxis);
-        // Square of velocity
-        var v2 = liftVelocity.sqrMagnitude;                                     
-
-        // Lift = velocity^2 * coefficient * liftPower
-        // Coefficient varies with AOA
-        var liftCoefficient = aoaCurve.Evaluate(angleOfAttack * Mathf.Rad2Deg);
-        var liftForce = v2 * liftCoefficient * liftPower;
-
-        // Lift is perpendicular to velocity
-        var liftDirection = Vector3.Cross(liftVelocity.normalized, rightAxis);
-        var lift = liftDirection * liftForce;
-
-        return lift;
+        // Apply upward force to lift the plane upwards
+        rb.AddForce(Vector3.up * rb.velocity.magnitude * lift);
     }
 
     private void FixedUpdate()
     {
-        //// Apply forward force to the plane
-        //rb.AddForce(transform.forward * maxThrust * throttle);
-        //// Apply rotational force on the x-axis to turn the plane up and down
-        //rb.AddTorque(transform.right * pitch * sensitivityModifier);
-        //// Apply rotational force on the z-axis to roll the plane left and right
-        //rb.AddTorque(-transform.forward * roll * sensitivityModifier);
-        //// Apply rotational force on the y-axis to turn the plane left and right
-        //rb.AddTorque(transform.up * yaw * sensitivityModifier);
-        //// Apply upward force to lift the plane upwards
-        //rb.AddForce(Vector3.up * rb.velocity.magnitude * lift);
-
-        float dt = Time.fixedDeltaTime;
-
-        // Calculate at start, to capture any changes that happened externally
-        CalculateState(dt);
-
         Thrust();
         Pitch();
         Roll();
         Yaw();
         Lift();
-
-        // Calculate again, so that other systems can read this plane's state
-        CalculateState(dt);
-    }
-
-    void IncreaseThrottle()
-    {
-        throttle += throttleIncrement;
-    }
-
-    void DecreaseThrottle()
-    {
-        throttle -= throttleIncrement;
     }
 
     private void UpdateHUD()
